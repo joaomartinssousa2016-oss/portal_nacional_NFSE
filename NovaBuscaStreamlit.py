@@ -1,5 +1,6 @@
 import contextlib
 import io
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -135,6 +136,24 @@ def build_report_dataframe() -> pd.DataFrame:
         .rename(columns={"qtd": "quantidade_xml"})
         .sort_values(["empresa", "mes_ano", "tipo"])
     )
+
+
+def build_notes_zip() -> tuple[io.BytesIO | None, int]:
+    if not OUTPUT_DIR.exists():
+        return None, 0
+
+    files = [p for p in OUTPUT_DIR.rglob("*") if p.is_file()]
+    if not files:
+        return None, 0
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in files:
+            arcname = file_path.relative_to(OUTPUT_DIR)
+            zf.write(file_path, arcname=str(arcname))
+
+    zip_buffer.seek(0)
+    return zip_buffer, len(files)
 
 
 def main() -> None:
@@ -298,6 +317,20 @@ def main() -> None:
                 file_name=f"relatorio_execucao_{stamp}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
+    st.subheader("Exportar notas")
+    zip_data, total_files = build_notes_zip()
+    if zip_data is None:
+        st.info("Nenhum arquivo encontrado em notasfiscais para exportar.")
+    else:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        st.caption(f"Arquivos prontos para exportacao: {total_files}")
+        st.download_button(
+            label="Baixar notasfiscais.zip",
+            data=zip_data,
+            file_name=f"notasfiscais_{stamp}.zip",
+            mime="application/zip",
+        )
 
     st.subheader("Log")
     st.text_area("Saida do processamento", value=st.session_state.log, height=300)
