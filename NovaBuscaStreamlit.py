@@ -232,10 +232,10 @@ def main() -> None:
     if "excel_df" not in st.session_state:
         st.session_state.excel_df = load_excel()
 
-    with st.expander("Modo cloud (teste): upload de planilha e certificados"):
+    with st.expander("Modo cloud: upload de planilha e certificados"):
         st.info(
             "Use esta area quando o app estiver no Streamlit Cloud. "
-            "Os arquivos podem ser perdidos em reinicio de servidor, pois e um modo de teste."
+            "Como o ambiente pode reiniciar, use backup ZIP para manter persistencia."
         )
 
         up_col1, up_col2 = st.columns(2)
