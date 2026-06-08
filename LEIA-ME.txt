@@ -1,0 +1,45 @@
+NOVABUSCA - PACOTE DE EXECUCAO
+
+Arquivos principais:
+- NovaBuscaUI.py -> interface visual
+- NovaBuscaStreamlit.py -> interface web via Streamlit
+- NovaBusca.py -> motor de processamento
+- empresas.xlsx -> planilha de cadastro
+- certificados\ -> coloque aqui os certificados .pfx ou .p12
+- notasfiscais\ -> pasta onde os XMLs serao salvos
+
+COMO USAR EM OUTRA MAQUINA
+
+1. Instale o Python 3.10 ou superior
+2. Abra o arquivo Instalar_Dependencias.bat
+3. Coloque os certificados na pasta certificados
+4. Preencha o empresas.xlsx ou use a interface visual
+5. Abra o arquivo Iniciar_NovaBusca.bat
+
+ALTERNATIVA VIA NAVEGADOR (STREAMLIT)
+
+- Abra o arquivo Iniciar_NovaBusca_Streamlit.bat
+- O navegador abrira com a interface web local
+- A logica de processamento e a mesma do NovaBusca.py
+
+OBSERVACOES
+
+- Os certificados devem ter nome no formato: CNPJ.pfx ou CNPJ.p12
+- Exemplo: 12345678000199.pfx
+- O Excel deve conter as colunas:
+  Nome empresa | cnpj | senha | data_inicio | data_fim
+- Datas aceitas:
+  DD/MM/YYYY
+  YYYY-MM-DD
+
+SAIDA
+
+- Os XMLs serao gravados em notasfiscais\EMPRESA\AAAA-MM\prestados
+- Os XMLs serao gravados em notasfiscais\EMPRESA\AAAA-MM\tomados
+- O relatorio pode ser gerado pela interface visual
+
+SE DER ERRO
+
+- Verifique se o Python esta instalado
+- Verifique se o certificado e a senha estao corretos
+- Verifique se a internet esta liberada para acesso a https://adn.nfse.gov.br

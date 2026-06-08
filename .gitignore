@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Local data and sensitive files
+certificados/
+notasfiscais/
+empresas.xlsx
+
+# Streamlit local settings
+.streamlit/secrets.toml
+
+# OS/editor
+.vscode/
+.DS_Store
+Thumbs.db

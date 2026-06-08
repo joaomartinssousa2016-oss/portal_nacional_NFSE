@@ -1,0 +1,5 @@
+pandas
+requests
+requests-pkcs12
+openpyxl
+streamlit
