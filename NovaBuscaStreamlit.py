@@ -11,6 +11,7 @@ from NovaBusca import main as worker_main
 APP_DIR = Path(__file__).resolve().parent
 EXCEL_PATH = APP_DIR / "empresas.xlsx"
 OUTPUT_DIR = APP_DIR / "notasfiscais"
+CERT_DIR = APP_DIR / "certificados"
 COLUMNS = ["Nome empresa", "cnpj", "senha", "data_inicio", "data_fim"]
 
 
@@ -41,6 +42,25 @@ def load_excel() -> pd.DataFrame:
 def save_excel(df: pd.DataFrame) -> None:
     out = normalize_df(df)
     out.to_excel(EXCEL_PATH, index=False)
+
+
+def save_uploaded_certificates(uploaded_files) -> tuple[list[str], list[str]]:
+    CERT_DIR.mkdir(parents=True, exist_ok=True)
+    saved = []
+    skipped = []
+
+    for up in uploaded_files:
+        name = (up.name or "").strip()
+        lower = name.lower()
+        if not (lower.endswith(".pfx") or lower.endswith(".p12")):
+            skipped.append(name or "(sem nome)")
+            continue
+
+        target = CERT_DIR / name
+        target.write_bytes(up.getvalue())
+        saved.append(name)
+
+    return saved, skipped
 
 
 def validate_date(value: str) -> bool:
@@ -127,6 +147,72 @@ def main() -> None:
 
     if "excel_df" not in st.session_state:
         st.session_state.excel_df = load_excel()
+
+    with st.expander("Modo cloud (teste): upload de planilha e certificados"):
+        st.info(
+            "Use esta area quando o app estiver no Streamlit Cloud. "
+            "Os arquivos podem ser perdidos em reinicio de servidor, pois e um modo de teste."
+        )
+
+        up_col1, up_col2 = st.columns(2)
+
+        with up_col1:
+            uploaded_excel = st.file_uploader(
+                "Importar empresas.xlsx",
+                type=["xlsx"],
+                accept_multiple_files=False,
+                key="upload_excel_cloud",
+            )
+            if st.button("Aplicar planilha enviada", use_container_width=True):
+                if uploaded_excel is None:
+                    st.warning("Selecione um arquivo .xlsx antes de aplicar.")
+                else:
+                    try:
+                        imported_df = pd.read_excel(uploaded_excel, dtype=str)
+                        imported_df = normalize_df(imported_df)
+                        st.session_state.excel_df = imported_df
+                        save_excel(imported_df)
+                        st.success("Planilha carregada no app e salva no servidor.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Falha ao importar planilha: {exc}")
+
+        with up_col2:
+            uploaded_certs = st.file_uploader(
+                "Enviar certificados (.pfx/.p12)",
+                type=["pfx", "p12"],
+                accept_multiple_files=True,
+                key="upload_cert_cloud",
+            )
+            if st.button("Salvar certificados enviados", use_container_width=True):
+                files = uploaded_certs or []
+                if not files:
+                    st.warning("Selecione ao menos um certificado para salvar.")
+                else:
+                    saved, skipped = save_uploaded_certificates(files)
+                    if saved:
+                        st.success(f"Certificados salvos: {', '.join(saved)}")
+                    if skipped:
+                        st.warning(f"Ignorados (extensao invalida): {', '.join(skipped)}")
+
+        if CERT_DIR.exists():
+            cert_files = sorted([p.name for p in CERT_DIR.glob("*.pfx")]) + sorted([p.name for p in CERT_DIR.glob("*.p12")])
+            if cert_files:
+                st.caption("Certificados atualmente disponiveis no servidor:")
+                st.write("\n".join(f"- {name}" for name in cert_files))
+            else:
+                st.caption("Nenhum certificado carregado no servidor.")
+
+        template_df = pd.DataFrame(columns=COLUMNS)
+        template_buffer = io.BytesIO()
+        template_df.to_excel(template_buffer, index=False)
+        template_buffer.seek(0)
+        st.download_button(
+            label="Baixar modelo empresas.xlsx",
+            data=template_buffer,
+            file_name="empresas_modelo.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     st.subheader("Cadastro de empresas")
     edited_df = st.data_editor(
