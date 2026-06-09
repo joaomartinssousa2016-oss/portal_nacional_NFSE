@@ -387,8 +387,10 @@ def main() -> None:
         num_rows="dynamic",
         use_container_width=True,
         key="empresas_editor",
+        hide_index=True,
     )
     edited_df = normalize_df(edited_df)
+    st.session_state.excel_df = edited_df.copy()
 
     st.subheader("Configuracoes")
     cfg_col1, cfg_col2, cfg_col3, cfg_col4 = st.columns([1, 1, 1, 2])
