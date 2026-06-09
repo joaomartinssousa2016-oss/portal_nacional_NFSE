@@ -221,6 +221,32 @@ def restore_from_backup_zip(uploaded_zip) -> tuple[int, int]:
     return restored, ignored
 
 
+def clear_all_imported_data() -> dict[str, int]:
+    removed_excel = 0
+    removed_cert_files = 0
+    removed_note_files = 0
+
+    if EXCEL_PATH.exists():
+        EXCEL_PATH.unlink()
+        removed_excel = 1
+
+    if CERT_DIR.exists():
+        cert_files = [p for p in CERT_DIR.rglob("*") if p.is_file()]
+        removed_cert_files = len(cert_files)
+        shutil.rmtree(CERT_DIR, ignore_errors=True)
+
+    if OUTPUT_DIR.exists():
+        note_files = [p for p in OUTPUT_DIR.rglob("*") if p.is_file()]
+        removed_note_files = len(note_files)
+        shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+
+    return {
+        "excel": removed_excel,
+        "certificados": removed_cert_files,
+        "notas": removed_note_files,
+    }
+
+
 def main() -> None:
     st.set_page_config(page_title="NovaBusca Streamlit", layout="wide")
     st.title("NovaBusca - Portal Nacional NFSe")
@@ -332,6 +358,28 @@ def main() -> None:
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Falha ao restaurar backup: {exc}")
+
+        st.divider()
+        st.caption("Limpeza total do ambiente cloud (dados importados nesta instancia).")
+        confirm_clear_all = st.checkbox(
+            "Confirmo que desejo excluir todas as informacoes importadas.",
+            value=False,
+            key="confirm_clear_all_cloud",
+        )
+        if st.button("Excluir todas as informacoes importadas", type="secondary", use_container_width=True):
+            if not confirm_clear_all:
+                st.warning("Marque a confirmacao antes de excluir.")
+            else:
+                removed = clear_all_imported_data()
+                st.session_state.excel_df = pd.DataFrame(columns=COLUMNS)
+                st.session_state.log = ""
+                st.success(
+                    "Limpeza concluida. "
+                    f"Excel removido: {removed['excel']}. "
+                    f"Certificados removidos: {removed['certificados']}. "
+                    f"Arquivos de notas removidos: {removed['notas']}."
+                )
+                st.rerun()
 
     st.subheader("Cadastro de empresas")
     edited_df = st.data_editor(
