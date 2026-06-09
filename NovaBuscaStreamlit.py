@@ -511,6 +511,40 @@ def main() -> None:
 
         st.dataframe(current_df, use_container_width=True, hide_index=True)
 
+        st.markdown("**Atualizar datas em lote**")
+        batch_col1, batch_col2 = st.columns(2)
+        with batch_col1:
+            batch_data_inicio = st.text_input(
+                "Nova data inicio para selecionadas",
+                key="batch_data_inicio",
+                placeholder="DD/MM/YYYY",
+            )
+        with batch_col2:
+            batch_data_fim = st.text_input(
+                "Nova data fim para selecionadas",
+                key="batch_data_fim",
+                placeholder="DD/MM/YYYY",
+            )
+
+        batch_labels = st.multiselect(
+            "Selecione as empresas para aplicar as datas",
+            options=list(selection_options.keys()),
+            key="batch_selected_labels",
+        )
+        if st.button("Aplicar datas em lote", use_container_width=True):
+            if not batch_labels:
+                st.warning("Selecione ao menos uma empresa para atualizar em lote.")
+            elif not validate_date(batch_data_inicio) or not validate_date(batch_data_fim):
+                st.warning("Datas invalidas. Use DD/MM/YYYY ou YYYY-MM-DD.")
+            else:
+                updated_df = current_df.copy()
+                selected_indexes = [selection_options[label] for label in batch_labels]
+                updated_df.loc[selected_indexes, "data_inicio"] = batch_data_inicio.strip()
+                updated_df.loc[selected_indexes, "data_fim"] = batch_data_fim.strip()
+                st.session_state.excel_df = normalize_df(updated_df)
+                st.success(f"Datas atualizadas para {len(selected_indexes)} empresa(s).")
+                st.rerun()
+
     st.subheader("Configuracoes")
     cfg_col1, cfg_col2, cfg_col3, cfg_col4 = st.columns([1, 1, 1, 2])
     with cfg_col1:
