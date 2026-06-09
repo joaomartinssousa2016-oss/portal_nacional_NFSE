@@ -247,6 +247,50 @@ def clear_all_imported_data() -> dict[str, int]:
     }
 
 
+def empty_company_row() -> dict[str, str]:
+    return {
+        "Nome empresa": "",
+        "cnpj": "",
+        "senha": "",
+        "data_inicio": "",
+        "data_fim": "",
+    }
+
+
+def ensure_form_state() -> None:
+    if "empresa_form" not in st.session_state:
+        st.session_state.empresa_form = empty_company_row()
+    if "empresa_edit_index" not in st.session_state:
+        st.session_state.empresa_edit_index = None
+
+
+def reset_company_form() -> None:
+    st.session_state.empresa_form = empty_company_row()
+    st.session_state.empresa_edit_index = None
+
+
+def load_company_form(index: int, df: pd.DataFrame) -> None:
+    row = df.iloc[index]
+    st.session_state.empresa_form = {
+        "Nome empresa": str(row.get("Nome empresa", "")),
+        "cnpj": str(row.get("cnpj", "")),
+        "senha": str(row.get("senha", "")),
+        "data_inicio": str(row.get("data_inicio", "")),
+        "data_fim": str(row.get("data_fim", "")),
+    }
+    st.session_state.empresa_edit_index = index
+
+
+def get_company_form_data() -> dict[str, str]:
+    return {
+        "Nome empresa": str(st.session_state.get("form_nome_empresa", "")).strip(),
+        "cnpj": str(st.session_state.get("form_cnpj", "")).strip(),
+        "senha": str(st.session_state.get("form_senha", "")).strip(),
+        "data_inicio": str(st.session_state.get("form_data_inicio", "")).strip(),
+        "data_fim": str(st.session_state.get("form_data_fim", "")).strip(),
+    }
+
+
 def main() -> None:
     st.set_page_config(page_title="NovaBusca Streamlit", layout="wide")
     st.title("NovaBusca - Portal Nacional NFSe")
@@ -257,6 +301,8 @@ def main() -> None:
 
     if "excel_df" not in st.session_state:
         st.session_state.excel_df = load_excel()
+
+    ensure_form_state()
 
     with st.expander("Modo cloud: upload de planilha e certificados"):
         st.info(
@@ -382,15 +428,88 @@ def main() -> None:
                 st.rerun()
 
     st.subheader("Cadastro de empresas")
-    edited_df = st.data_editor(
-        st.session_state.excel_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="empresas_editor",
-        hide_index=True,
-    )
-    edited_df = normalize_df(edited_df)
-    st.session_state.excel_df = edited_df.copy()
+    current_df = normalize_df(st.session_state.excel_df)
+
+    form_state = st.session_state.empresa_form
+    fcol1, fcol2, fcol3, fcol4, fcol5 = st.columns(5)
+    with fcol1:
+        st.text_input("Nome empresa", key="form_nome_empresa", value=form_state["Nome empresa"])
+    with fcol2:
+        st.text_input("CNPJ", key="form_cnpj", value=form_state["cnpj"])
+    with fcol3:
+        st.text_input("Senha", key="form_senha", value=form_state["senha"], type="password")
+    with fcol4:
+        st.text_input("Data inicio", key="form_data_inicio", value=form_state["data_inicio"], placeholder="DD/MM/YYYY")
+    with fcol5:
+        st.text_input("Data fim", key="form_data_fim", value=form_state["data_fim"], placeholder="DD/MM/YYYY")
+
+    row_data = get_company_form_data()
+    form_actions = st.columns([1, 1, 1, 2])
+    with form_actions[0]:
+        if st.button("Adicionar empresa", use_container_width=True):
+            candidate_df = pd.DataFrame([row_data], columns=COLUMNS)
+            errors = validate_rows(candidate_df)
+            if errors:
+                st.error(errors[0])
+            else:
+                st.session_state.excel_df = normalize_df(pd.concat([current_df, candidate_df], ignore_index=True))
+                reset_company_form()
+                st.rerun()
+
+    with form_actions[1]:
+        if st.button("Atualizar empresa", use_container_width=True):
+            edit_index = st.session_state.empresa_edit_index
+            if edit_index is None:
+                st.warning("Carregue uma empresa da lista antes de atualizar.")
+            else:
+                candidate_df = pd.DataFrame([row_data], columns=COLUMNS)
+                errors = validate_rows(candidate_df)
+                if errors:
+                    st.error(errors[0])
+                else:
+                    updated_df = current_df.copy()
+                    updated_df.loc[edit_index, COLUMNS] = [row_data[col] for col in COLUMNS]
+                    st.session_state.excel_df = normalize_df(updated_df)
+                    reset_company_form()
+                    st.rerun()
+
+    with form_actions[2]:
+        if st.button("Limpar campos", use_container_width=True):
+            reset_company_form()
+            st.rerun()
+
+    if current_df.empty:
+        st.info("Nenhuma empresa cadastrada.")
+    else:
+        selection_options = {
+            f"{idx} - {row['Nome empresa'] or row['cnpj']}": idx
+            for idx, row in current_df.iterrows()
+        }
+        select_col1, select_col2, select_col3 = st.columns([3, 1, 1])
+        with select_col1:
+            selected_label = st.selectbox(
+                "Empresa para editar ou remover",
+                options=[""] + list(selection_options.keys()),
+                key="empresa_selected_label",
+            )
+        with select_col2:
+            if st.button("Carregar", use_container_width=True):
+                if not selected_label:
+                    st.warning("Selecione uma empresa primeiro.")
+                else:
+                    load_company_form(selection_options[selected_label], current_df)
+                    st.rerun()
+        with select_col3:
+            if st.button("Remover", use_container_width=True):
+                if not selected_label:
+                    st.warning("Selecione uma empresa primeiro.")
+                else:
+                    idx = selection_options[selected_label]
+                    st.session_state.excel_df = normalize_df(current_df.drop(index=idx).reset_index(drop=True))
+                    reset_company_form()
+                    st.rerun()
+
+        st.dataframe(current_df, use_container_width=True, hide_index=True)
 
     st.subheader("Configuracoes")
     cfg_col1, cfg_col2, cfg_col3, cfg_col4 = st.columns([1, 1, 1, 2])
@@ -404,9 +523,10 @@ def main() -> None:
         somente_selecionadas = st.checkbox("Processar somente linhas selecionadas", value=False)
 
     selected_rows = None
-    if somente_selecionadas and not edited_df.empty:
-        options = list(range(len(edited_df)))
-        labels = [f"{idx} - {edited_df.iloc[idx]['Nome empresa']}" for idx in options]
+    current_df = normalize_df(st.session_state.excel_df)
+    if somente_selecionadas and not current_df.empty:
+        options = list(range(len(current_df)))
+        labels = [f"{idx} - {current_df.iloc[idx]['Nome empresa']}" for idx in options]
         selected_labels = st.multiselect("Linhas para processar", options=labels)
         selected_rows = [int(label.split(" - ", 1)[0]) for label in selected_labels]
 
@@ -414,14 +534,15 @@ def main() -> None:
 
     with action_col1:
         if st.button("Salvar Excel", use_container_width=True):
-            errors = validate_rows(edited_df)
+            current_df = normalize_df(st.session_state.excel_df)
+            errors = validate_rows(current_df)
             if errors:
                 st.error("Corrija os dados antes de salvar.")
                 for err in errors[:10]:
                     st.write(f"- {err}")
             else:
-                save_excel(edited_df)
-                st.session_state.excel_df = edited_df
+                save_excel(current_df)
+                st.session_state.excel_df = current_df
                 st.success(f"Excel salvo em: {EXCEL_PATH}")
 
     with action_col2:
@@ -432,10 +553,11 @@ def main() -> None:
 
     with action_col3:
         if st.button("Rodar busca", type="primary", use_container_width=True):
-            if edited_df.empty:
+            current_df = normalize_df(st.session_state.excel_df)
+            if current_df.empty:
                 st.warning("Adicione pelo menos uma empresa para executar.")
             else:
-                errors = validate_rows(edited_df)
+                errors = validate_rows(current_df)
                 if errors:
                     st.error("Existem dados invalidos. Corrija antes de executar.")
                     for err in errors[:10]:
@@ -443,8 +565,8 @@ def main() -> None:
                 elif somente_selecionadas and not selected_rows:
                     st.warning("Selecione ao menos uma linha para processar.")
                 else:
-                    save_excel(edited_df)
-                    st.session_state.excel_df = edited_df
+                    save_excel(current_df)
+                    st.session_state.excel_df = current_df
                     with st.spinner("Executando busca... isso pode levar alguns minutos."):
                         output = run_worker(baixar_xml, baixar_pdf, pdf_tipo, selected_rows)
                     st.session_state.log = output
